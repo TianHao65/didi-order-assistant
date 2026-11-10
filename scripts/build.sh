@@ -6,6 +6,7 @@ task_root="$(cd "$(dirname "$0")/.." && pwd)"
 task_tools="$ANDROID_HOME/build-tools/35.0.0"
 task_android_jar="$ANDROID_HOME/platforms/android-35/android.jar"
 task_build="$task_root/app/build/manual"
+rm -rf "$task_build/generated" "$task_build/classes" "$task_build/dex"
 mkdir -p "$task_build/generated" "$task_build/classes" "$task_build/dex" "$task_root/dist"
 rm -f "$task_build/resources.zip" "$task_build/unsigned.apk" "$task_build/aligned.apk"
 "$task_tools/aapt2" compile --dir "$task_root/app/src/main/res" -o "$task_build/resources.zip"
@@ -13,7 +14,7 @@ rm -f "$task_build/resources.zip" "$task_build/unsigned.apk" "$task_build/aligne
 sed 's/<manifest /<manifest package="local.ridewatch" /' "$task_root/app/src/main/AndroidManifest.xml" > "$task_build/AndroidManifest.xml"
 "$task_tools/aapt2" link -o "$task_build/unsigned.apk" -I "$task_android_jar" \
     --manifest "$task_build/AndroidManifest.xml" --java "$task_build/generated" \
-    --min-sdk-version 26 --target-sdk-version 35 --version-code 1 --version-name 0.1.0 "$task_build/resources.zip"
+    --min-sdk-version 26 --target-sdk-version 35 --version-code 2 --version-name 0.2.0 "$task_build/resources.zip"
 find "$task_root/app/src/main/java" "$task_build/generated" -name '*.java' -print > "$task_build/sources.txt"
 javac -encoding UTF-8 --release 8 -classpath "$task_android_jar" -d "$task_build/classes" @"$task_build/sources.txt"
 jar cf "$task_build/classes.jar" -C "$task_build/classes" .

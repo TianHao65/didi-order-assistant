@@ -17,6 +17,7 @@ import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
+import org.json.JSONArray;
 
 public final class OrderAccessibilityService extends AccessibilityService {
     private final Handler handler = new Handler(Looper.getMainLooper());
@@ -77,13 +78,16 @@ public final class OrderAccessibilityService extends AccessibilityService {
             if (preview) {
                 StringBuilder report = new StringBuilder("识别到 " + orders.size() + " 条订单\n");
                 List<OrderEngine.Order> candidates = OrderEngine.parse(snapshot, LocalDate.now(), p.getInt("originLine", 0), p.getInt("destinationLine", 0), true);
+                JSONArray cards = new JSONArray();
                 for (OrderEngine.Order order : candidates) {
+                    if (cards.length() < 20) cards.put(OrderCards.encode(order, AppConfig.rule(this), LocalDate.now()));
                     report.append("\n").append(order.summary()).append("\n");
                     String[] lines = order.raw.split("\n");
                     for (int i = 0; i < lines.length; i++) report.append(i + 1).append(". ").append(lines[i]).append("\n");
                 }
                 if (candidates.isEmpty()) report.append("\n页面原始文字（仅本机保存）\n").append(page.substring(0, Math.min(page.length(), 7000)));
-                p.edit().putString("preview", report.toString()).putLong("previewUntil", 0).apply();
+                p.edit().putString("preview", report.toString()).putString("previewOrders", cards.toString())
+                    .putLong("previewCaptured", System.currentTimeMillis()).putLong("previewUntil", 0).apply();
                 if (!running) { state("预览已捕获，返回本应用查看", false); return; }
             }
             boolean listPage = !orders.isEmpty() || page.contains("暂无订单") || page.contains("暂无顺路乘客")
@@ -99,7 +103,13 @@ public final class OrderAccessibilityService extends AccessibilityService {
                     if (Notices.allowed(this)) { fresh.add(order); seen.put(order.key(), now); }
                 }
                 while (seen.size() > 300) seen.remove(seen.keySet().iterator().next());
-                if (!fresh.isEmpty()) { Notices.matches(this, fresh); p.edit().putString("lastMatch", LocalTime.now().withNano(0) + " · " + fresh.get(0).summary()).apply(); }
+                if (!fresh.isEmpty()) {
+                    Notices.matches(this, fresh);
+                    JSONArray cards = new JSONArray();
+                    for (OrderEngine.Order order : fresh) if (cards.length() < 5) cards.put(OrderCards.encode(order, rule, LocalDate.now()));
+                    p.edit().putString("lastMatch", LocalTime.now().withNano(0) + " · " + fresh.get(0).summary()).putString("lastOrders", cards.toString()).apply();
+                }
+                p.edit().putInt("visibleCount", orders.size()).apply();
                 state("当前识别 " + orders.size() + " 条订单 · 每 " + AppConfig.interval(this) + " 秒刷新", running);
             }
             if (running && allowRefresh && now - lastRefresh >= AppConfig.interval(this) * 1000L) {
